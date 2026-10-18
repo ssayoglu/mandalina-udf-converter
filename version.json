@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-10-18",
+  "author": "Av. Lütfi Serkan SAYOĞLU",
+  "repo": "https://github.com/ssayoglu/mandalina-udf-converter",
+  "changelog": [
+    "🍊 Tangerine Tarzı Radyal Çark Deneyimi: Finder'da dosya sürüklerken ⇧ Shift (Format Dönüştür), ⌘ Command (UYAP & Evrak Araçları) ve ⌃ Control (Dosya İşlemleri) ile açılan sıfır tıklamalı dairesel menü.",
+    "⚖️ Yerel UYAP (.udf) Motoru: UDF ↔ PDF, Word (.docx), Çok Sayfalı TIFF, HTML, Markdown, TXT ve RTF dönüşümleri; tablo, hizalama ve e-imza doğrulama başlığı koruması.",
+    "📑 Çok Sayfalı TIFF & Görsel Motoru: Çok sayfalı .tiff / .tif taramalarını tek hareketle çok sayfalı A4 PDF'e veya LZW sıkıştırmalı TIFF'e dönüştürme.",
+    "🔍 Çevrimdışı Türkçe OCR (Apple Vision): Taranmış TIFF, PDF ve görselleri internet gerektirmeden okuyup doğrudan UYAP (.udf) veya Word (.docx) belgesine çevirme.",
+    "🛠️ UYAP Boyut Sıkıştırma (<5MB), PDF/Evrak Birleştirme, Sayfa Bölme ve Dahili UDF/TIFF Önizleyici.",
+    "🚀 Tek Komutla Kurulum (install.sh) ve Uygulama İçi / Tek Tıkla Güncelleme (update.sh & Guncelle.command)."
+  ]
+}
