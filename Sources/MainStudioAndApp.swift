@@ -103,13 +103,6 @@ struct MainStudioView: View {
 
             Spacer()
 
-            Toggle(isOn: $coordinator.isFloatingPillVisible) {
-                Text("Yüzen Kapsül")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .toggleStyle(.switch)
-            .controlSize(.small)
-
             Button {
                 AppUpdater.runOneClickUpdate()
             } label: {
@@ -774,15 +767,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let btn = statusItem.button {
-            btn.title = "🍊"
-            btn.toolTip = "Mandalina — UDF & TIFF Dönüştürücü"
+            btn.title = "🍊 Mandalina"
+            btn.toolTip = "Mandalina — Dosyayı buraya sürükleyin veya tıklayın"
+            DragCoordinator.shared.attachDragTarget(to: btn)
         }
 
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Mandalina Stüdyo'yu Aç", action: #selector(openStudioWindow), keyEquivalent: "o"))
         menu.addItem(NSMenuItem(title: "Seçili Finder Dosyası İçin Çarkı Aç (⇧)", action: #selector(openWheelForFinderSelection), keyEquivalent: "k"))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "Yüzen Sürükle-Bırak Kapsülünü Göster/Gizle", action: #selector(toggleFloatingPill), keyEquivalent: "p"))
         menu.addItem(NSMenuItem(title: "Örnek Dosyalar Klasörünü Aç", action: #selector(openDemoFolder), keyEquivalent: "d"))
         menu.addItem(NSMenuItem(title: "Güncellemeleri Denetle / Güncelle", action: #selector(triggerUpdate), keyEquivalent: "u"))
         menu.addItem(NSMenuItem.separator())
@@ -818,10 +811,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openWheelForFinderSelection() {
         let urls = DragCoordinator.shared.queryFinderSelectionOrDemoFiles()
         DragCoordinator.shared.openWheel(for: urls, mode: .convert)
-    }
-
-    @objc private func toggleFloatingPill() {
-        DragCoordinator.shared.isFloatingPillVisible.toggle()
     }
 
     @objc private func openDemoFolder() {

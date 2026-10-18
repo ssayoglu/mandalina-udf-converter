@@ -97,14 +97,10 @@ final class ToastHUDController {
     }
 }
 
-// MARK: - Floating Edge Drop Pill (Zero-Permission Drag Target)
+// MARK: - Menu Bar Status Item Drag Target View
 
-final class FloatingDropPillView: NSView {
+final class MenuBarDragTargetView: NSView {
     var onDragEnteredWithURLs: (([URL], NSPoint) -> Void)?
-    var onClickedPill: (() -> Void)?
-    private var isHighlighted = false {
-        didSet { needsDisplay = true }
-    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -115,84 +111,26 @@ final class FloatingDropPillView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 2, dy: 2), xRadius: 22, yRadius: 22)
-        let bgColor = isHighlighted
-            ? NSColor(calibratedRed: 1.0, green: 0.45, blue: 0.12, alpha: 0.96)
-            : NSColor.windowBackgroundColor.withAlphaComponent(0.92)
-        bgColor.setFill()
-        path.fill()
-
-        let strokeColor = NSColor(calibratedRed: 1.0, green: 0.45, blue: 0.12, alpha: 0.85)
-        strokeColor.setStroke()
-        path.lineWidth = isHighlighted ? 2.5 : 1.5
-        path.stroke()
-
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
-        let textColor = isHighlighted ? NSColor.white : NSColor.labelColor
-        let title = "🍊 Mandalina · Bırak & Çevir" as NSString
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 12.5, weight: .bold),
-            .foregroundColor: textColor,
-            .paragraphStyle: paragraph
-        ]
-        title.draw(in: NSRect(x: 8, y: 13, width: bounds.width - 16, height: 20), withAttributes: attrs)
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // Let normal left/right clicks pass through to NSStatusBarButton so the menu opens normally
+        return nil
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        isHighlighted = true
         if let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
            !urls.isEmpty {
-            let screenPt = NSEvent.mouseLocation
-            onDragEnteredWithURLs?(urls, screenPt)
+            onDragEnteredWithURLs?(urls, NSEvent.mouseLocation)
         }
         return .copy
     }
 
-    override func draggingExited(_ sender: NSDraggingInfo?) {
-        isHighlighted = false
-    }
-
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        isHighlighted = false
         if let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
            !urls.isEmpty {
             onDragEnteredWithURLs?(urls, NSEvent.mouseLocation)
             return true
         }
         return false
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        onClickedPill?()
-    }
-}
-
-final class FloatingDropPillPanel: NSPanel {
-    let pillView = FloatingDropPillView(frame: NSRect(x: 0, y: 0, width: 210, height: 46))
-
-    init() {
-        super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 210, height: 46),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.isFloatingPanel = true
-        self.level = .floating
-        self.backgroundColor = .clear
-        self.isOpaque = false
-        self.hasShadow = true
-        self.isMovableByWindowBackground = true
-        self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        self.contentView = pillView
-
-        if let screen = NSScreen.main {
-            let vf = screen.visibleFrame
-            setFrameOrigin(NSPoint(x: vf.maxX - 226, y: vf.minY + 36))
-        }
     }
 }
 
@@ -202,18 +140,8 @@ final class DragCoordinator: ObservableObject {
     static let shared = DragCoordinator()
 
     @Published var history: [ConversionRecord] = []
-    @Published var isFloatingPillVisible: Bool = true {
-        didSet {
-            if isFloatingPillVisible {
-                dropPillPanel.orderFrontRegardless()
-            } else {
-                dropPillPanel.orderOut(nil)
-            }
-        }
-    }
 
     let radialPanel = RadialWheelPanel()
-    let dropPillPanel = FloatingDropPillPanel()
 
     private var globalFlagsMonitor: Any?
     private var localFlagsMonitor: Any?
@@ -233,7 +161,6 @@ final class DragCoordinator: ObservableObject {
         lastDragPasteboardCount = NSPasteboard(name: .drag).changeCount
         setupCallbacks()
         startMonitoring()
-        dropPillPanel.orderFrontRegardless()
     }
 
     private func setupCallbacks() {
@@ -243,20 +170,17 @@ final class DragCoordinator: ObservableObject {
         radialPanel.containerView.onCancel = { [weak self] in
             self?.radialPanel.dismissWheel()
         }
+    }
 
-        dropPillPanel.pillView.onDragEnteredWithURLs = { [weak self] urls, screenPoint in
+    func attachDragTarget(to statusButton: NSStatusBarButton) {
+        let overlay = MenuBarDragTargetView(frame: statusButton.bounds)
+        overlay.autoresizingMask = [.width, .height]
+        overlay.onDragEnteredWithURLs = { [weak self] urls, screenPt in
             guard let self = self else { return }
             self.activeDraggedURLs = urls
-            self.radialPanel.present(at: screenPoint, with: urls, mode: .convert)
+            self.radialPanel.present(at: screenPt, with: urls, mode: .convert)
         }
-
-        dropPillPanel.pillView.onClickedPill = { [weak self] in
-            guard let self = self else { return }
-            let urls = self.queryFinderSelectionOrDemoFiles()
-            if !urls.isEmpty {
-                self.radialPanel.present(at: NSEvent.mouseLocation, with: urls, mode: .convert)
-            }
-        }
+        statusButton.addSubview(overlay)
     }
 
     func startMonitoring() {
@@ -431,7 +355,7 @@ final class DragCoordinator: ObservableObject {
 
         case .shareAirDrop:
             isProcessingAction = false
-            if let contentView = NSApp.keyWindow?.contentView ?? dropPillPanel.contentView {
+            if let contentView = NSApp.keyWindow?.contentView ?? radialPanel.contentView {
                 let picker = NSSharingServicePicker(items: urls)
                 picker.show(relativeTo: contentView.bounds, of: contentView, preferredEdge: .minY)
             }
