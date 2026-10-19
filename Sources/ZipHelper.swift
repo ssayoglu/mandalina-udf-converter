@@ -93,18 +93,30 @@ struct ZipHelper {
         }
 
         // Use /usr/bin/zip -r -q so that paths are stored relative to tempDir root without __MACOSX resource forks
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-        proc.currentDirectoryURL = tempDir
-        proc.arguments = ["-r", "-q", "-X", destinationURL.path, "."]
-        let errPipe = Pipe()
-        proc.standardError = errPipe
-        try proc.run()
-        proc.waitUntilExit()
+        var archived = false
+        if fm.fileExists(atPath: "/usr/bin/zip") {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+            proc.currentDirectoryURL = tempDir
+            proc.arguments = ["-r", "-q", "-X", destinationURL.path, "."]
+            if (try? proc.run()) != nil {
+                proc.waitUntilExit()
+                archived = (proc.terminationStatus == 0 && fm.fileExists(atPath: destinationURL.path))
+            }
+        }
 
-        if proc.terminationStatus != 0 || !fm.fileExists(atPath: destinationURL.path) {
-            let errMsg = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "Bilinmeyen hata"
-            throw ZipHelperError.archiveFailed(errMsg)
+        if !archived {
+            let dittoProc = Process()
+            dittoProc.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
+            dittoProc.arguments = ["-c", "-k", "--norsrc", tempDir.path, destinationURL.path]
+            let errPipe = Pipe()
+            dittoProc.standardError = errPipe
+            try dittoProc.run()
+            dittoProc.waitUntilExit()
+            if dittoProc.terminationStatus != 0 || !fm.fileExists(atPath: destinationURL.path) {
+                let errMsg = String(data: errPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "Bilinmeyen hata"
+                throw ZipHelperError.archiveFailed(errMsg)
+            }
         }
     }
 }

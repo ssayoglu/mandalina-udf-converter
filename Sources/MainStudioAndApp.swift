@@ -3,15 +3,33 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Main Studio ViewModel (Avoids SwiftUIMacros @State plugin dependency on standalone CLT)
+
+final class MainStudioViewModel: ObservableObject {
+    static let shared = MainStudioViewModel()
+
+    @Published var sampleFiles: [URL] = []
+    @Published var selectedFileURLs: [URL] = []
+    @Published var selectedBentoCategory: FileCategory = .udf
+    @Published var isDropTargeted: Bool = false
+
+    private init() {
+        refreshSampleFiles()
+    }
+
+    func refreshSampleFiles() {
+        sampleFiles = DemoFilesGenerator.ensureSampleFilesExist()
+        if selectedFileURLs.isEmpty, let first = sampleFiles.first {
+            selectedFileURLs = [first]
+        }
+    }
+}
+
 // MARK: - Main Studio SwiftUI View (Tangerine Aesthetic)
 
 struct MainStudioView: View {
     @ObservedObject var coordinator = DragCoordinator.shared
-
-    @State private var sampleFiles: [URL] = []
-    @State private var selectedFileURLs: [URL] = []
-    @State private var selectedBentoCategory: FileCategory = .udf
-    @State private var isDropTargeted: Bool = false
+    @ObservedObject var vm = MainStudioViewModel.shared
 
     var body: some View {
         ScrollView {
@@ -45,10 +63,7 @@ struct MainStudioView: View {
             )
         )
         .onAppear {
-            sampleFiles = DemoFilesGenerator.ensureSampleFilesExist()
-            if selectedFileURLs.isEmpty, let first = sampleFiles.first {
-                selectedFileURLs = [first]
-            }
+            vm.refreshSampleFiles()
         }
     }
 
@@ -139,7 +154,7 @@ struct MainStudioView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .stroke(isDropTargeted ? Color.white : Color.white.opacity(0.18), lineWidth: isDropTargeted ? 3 : 1)
+                        .stroke(vm.isDropTargeted ? Color.white : Color.white.opacity(0.18), lineWidth: vm.isDropTargeted ? 3 : 1)
                 )
                 .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
 
@@ -156,7 +171,7 @@ struct MainStudioView: View {
                         .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundColor(.white)
 
-                    Text("Finder'dan herhangi bir .udf, .tiff, .pdf, .docx veya görsel dosyasını buraya (veya ekranın sağ altındaki yüzen kapsüle) sürükleyin; ya da aşağıdaki hazır örnek dosyalara tıklayarak çarkı deneyin.")
+                    Text("Finder'dan herhangi bir .udf, .tiff, .pdf, .docx veya görsel dosyasını buraya (veya üst menü çubuğundaki 🍊 Mandalina simgesine) sürükleyin; ya da aşağıdaki hazır örnek dosyalara tıklayarak çarkı deneyin.")
                         .font(.system(size: 13))
                         .foregroundColor(.white.opacity(0.88))
                         .multilineTextAlignment(.center)
@@ -165,8 +180,8 @@ struct MainStudioView: View {
 
                 // Sample Interactive File Cards on Stage
                 HStack(spacing: 14) {
-                    ForEach(sampleFiles, id: \.path) { url in
-                        let isSelected = (selectedFileURLs.first == url)
+                    ForEach(vm.sampleFiles, id: \.path) { url in
+                        let isSelected = (vm.selectedFileURLs.first == url)
                         let cat = FileCategory.detect(from: [url])
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
@@ -194,7 +209,7 @@ struct MainStudioView: View {
 
                             HStack(spacing: 6) {
                                 Button {
-                                    selectedFileURLs = [url]
+                                    vm.selectedFileURLs = [url]
                                     coordinator.openWheel(for: [url], mode: .convert)
                                 } label: {
                                     Text("⇧ Çarkı Aç")
@@ -234,11 +249,11 @@ struct MainStudioView: View {
                                 )
                         )
                         .onDrag {
-                            selectedFileURLs = [url]
+                            vm.selectedFileURLs = [url]
                             return NSItemProvider(object: url as NSURL)
                         }
                         .onTapGesture {
-                            selectedFileURLs = [url]
+                            vm.selectedFileURLs = [url]
                             coordinator.openWheel(for: [url], mode: .convert)
                         }
                     }
@@ -246,11 +261,11 @@ struct MainStudioView: View {
                 .padding(.horizontal, 16)
 
                 // Active file bar
-                if !selectedFileURLs.isEmpty {
+                if !vm.selectedFileURLs.isEmpty {
                     HStack(spacing: 12) {
                         Image(systemName: "sparkles")
                             .foregroundColor(.orange)
-                        Text("Seçili Evrak: \(selectedFileURLs.map { $0.lastPathComponent }.joined(separator: ", "))")
+                        Text("Seçili Evrak: \(vm.selectedFileURLs.map { $0.lastPathComponent }.joined(separator: ", "))")
                             .font(.system(size: 12.5, weight: .semibold))
                             .foregroundColor(.white)
                             .lineLimit(1)
@@ -258,7 +273,7 @@ struct MainStudioView: View {
                         Spacer()
 
                         Button {
-                            coordinator.openWheel(for: selectedFileURLs, mode: .convert)
+                            coordinator.openWheel(for: vm.selectedFileURLs, mode: .convert)
                         } label: {
                             Text("⇧ Format Dönüştür")
                                 .font(.system(size: 12, weight: .bold))
@@ -271,7 +286,7 @@ struct MainStudioView: View {
                         .buttonStyle(.plain)
 
                         Button {
-                            coordinator.openWheel(for: selectedFileURLs, mode: .tools)
+                            coordinator.openWheel(for: vm.selectedFileURLs, mode: .tools)
                         } label: {
                             Text("⌘ Dosya Araçları")
                                 .font(.system(size: 12, weight: .bold))
@@ -284,7 +299,7 @@ struct MainStudioView: View {
                         .buttonStyle(.plain)
 
                         Button {
-                            coordinator.openWheel(for: selectedFileURLs, mode: .actions)
+                            coordinator.openWheel(for: vm.selectedFileURLs, mode: .actions)
                         } label: {
                             Text("⌃ İşlemler")
                                 .font(.system(size: 12, weight: .bold))
@@ -307,10 +322,10 @@ struct MainStudioView: View {
             }
             .padding(.vertical, 26)
         }
-        .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+        .onDrop(of: [.fileURL], isTargeted: $vm.isDropTargeted) { providers in
             extractDroppedURLs(from: providers) { urls in
                 guard !urls.isEmpty else { return }
-                selectedFileURLs = urls
+                vm.selectedFileURLs = urls
                 coordinator.openWheel(for: urls, mode: .convert)
             }
             return true
@@ -396,10 +411,10 @@ struct MainStudioView: View {
             // Category Pills
             HStack(spacing: 8) {
                 ForEach([FileCategory.udf, .tiff, .pdf, .word, .image]) { cat in
-                    let isSelected = (selectedBentoCategory == cat)
+                    let isSelected = (vm.selectedBentoCategory == cat)
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
-                            selectedBentoCategory = cat
+                            vm.selectedBentoCategory = cat
                         }
                     } label: {
                         HStack(spacing: 6) {
@@ -420,7 +435,7 @@ struct MainStudioView: View {
             }
 
             // Action Grid for Selected Category
-            let dummyURL = sampleURL(for: selectedBentoCategory)
+            let dummyURL = sampleURL(for: vm.selectedBentoCategory)
             let convertSlices = FileCategory.slices(for: [dummyURL], mode: .convert)
             let toolSlices = FileCategory.slices(for: [dummyURL], mode: .tools)
 
@@ -435,14 +450,14 @@ struct MainStudioView: View {
                             .background(Color.orange.opacity(0.2))
                             .foregroundColor(.orange)
                             .cornerRadius(4)
-                        Text("\(selectedBentoCategory.rawValue) — Format Dönüşümleri")
+                        Text("\(vm.selectedBentoCategory.rawValue) — Format Dönüşümleri")
                             .font(.system(size: 14, weight: .bold))
                     }
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(convertSlices) { slice in
                             Button {
-                                let targetURLs = !selectedFileURLs.isEmpty ? selectedFileURLs : [dummyURL]
+                                let targetURLs = !vm.selectedFileURLs.isEmpty ? vm.selectedFileURLs : [dummyURL]
                                 coordinator.handleSliceSelection(slice: slice, urls: targetURLs)
                             } label: {
                                 HStack(spacing: 10) {
@@ -495,7 +510,7 @@ struct MainStudioView: View {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(toolSlices) { slice in
                             Button {
-                                let targetURLs = !selectedFileURLs.isEmpty ? selectedFileURLs : [dummyURL]
+                                let targetURLs = !vm.selectedFileURLs.isEmpty ? vm.selectedFileURLs : [dummyURL]
                                 coordinator.handleSliceSelection(slice: slice, urls: targetURLs)
                             } label: {
                                 HStack(spacing: 10) {
@@ -624,15 +639,15 @@ struct MainStudioView: View {
     private func sampleURL(for category: FileCategory) -> URL {
         switch category {
         case .udf:
-            return sampleFiles.first(where: { $0.pathExtension.lowercased() == "udf" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Ornek_Dava_Dilekcesi.udf")
+            return vm.sampleFiles.first(where: { $0.pathExtension.lowercased() == "udf" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Ornek_Dava_Dilekcesi.udf")
         case .tiff:
-            return sampleFiles.first(where: { $0.pathExtension.lowercased() == "tiff" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Tebligat_3_Sayfa.tiff")
+            return vm.sampleFiles.first(where: { $0.pathExtension.lowercased() == "tiff" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Tebligat_3_Sayfa.tiff")
         case .pdf:
-            return sampleFiles.first(where: { $0.pathExtension.lowercased() == "pdf" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Bilirkisi_Raporu.pdf")
+            return vm.sampleFiles.first(where: { $0.pathExtension.lowercased() == "pdf" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Bilirkisi_Raporu.pdf")
         case .word:
-            return sampleFiles.first(where: { $0.pathExtension.lowercased() == "docx" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Sozlesme_Taslagi.docx")
+            return vm.sampleFiles.first(where: { $0.pathExtension.lowercased() == "docx" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Sozlesme_Taslagi.docx")
         default:
-            return sampleFiles.first(where: { $0.pathExtension.lowercased() == "tiff" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Tebligat_3_Sayfa.tiff")
+            return vm.sampleFiles.first(where: { $0.pathExtension.lowercased() == "tiff" }) ?? DemoFilesGenerator.demoDirectoryURL.appendingPathComponent("Tebligat_3_Sayfa.tiff")
         }
     }
 
@@ -643,7 +658,7 @@ struct MainStudioView: View {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         if panel.runModal() == .OK, !panel.urls.isEmpty {
-            selectedFileURLs = panel.urls
+            vm.selectedFileURLs = panel.urls
             coordinator.openWheel(for: panel.urls, mode: .convert)
         }
     }
